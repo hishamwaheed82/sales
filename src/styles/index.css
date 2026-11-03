@@ -1,0 +1,30 @@
+﻿@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Enterprise polish — subtle motion + readable tables */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-page-in {
+  animation: page-in 0.22s ease-out;
+}
+
+.enterprise-table thead th,
+.enterprise-table > .grid:first-child,
+.enterprise-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #F4F7FC;
+}
+
+.enterprise-zebra > .grid:nth-child(even),
+.enterprise-zebra > div:nth-child(even) {
+  background-color: #FAFBFD;
+}
+.enterprise-zebra > .grid:hover,
+.enterprise-zebra > div:hover {
+  background-color: #F0F5FB !important;
+}
