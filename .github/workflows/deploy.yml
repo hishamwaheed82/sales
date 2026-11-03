@@ -39,6 +39,10 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         shell: pwsh
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:WD_SERVER) -or [string]::IsNullOrWhiteSpace($env:WD_SITE) -or [string]::IsNullOrWhiteSpace($env:WD_PASSWORD)) {
+            Write-Host "::warning::WEBDEPLOY_* secrets missing — build OK, deploy skipped. Copy WEBDEPLOY_SERVER/SITE/USERNAME/PASSWORD from account/portal repo secrets."
+            exit 0
+          }
           $msdeploy = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
           if (-not (Test-Path $msdeploy)) { choco install webdeploy -y --no-progress }
           if (-not (Test-Path $msdeploy)) { throw "msdeploy.exe not found" }
@@ -51,7 +55,7 @@ jobs:
             '-allowUntrusted',
             '-verbose'
           )
-          & $msdeploy @msArgs 2>&1 | ForEach-Object { "$_".Replace($env:WD_PASSWORD, '***') }
+          & $msdeploy @msArgs 2>&1 | ForEach-Object { if ($env:WD_PASSWORD) { "$_".Replace($env:WD_PASSWORD, '***') } else { "$_" } }
           if ($LASTEXITCODE -ne 0) { throw "msdeploy failed ($LASTEXITCODE)" }
         env:
           WD_SERVER: ${{ secrets.WEBDEPLOY_SERVER }}
