@@ -5,15 +5,15 @@ const AUTH_URL = (import.meta as any).env?.DEV
   ? ""
   : String((import.meta as any).env?.VITE_AUTH_URL ?? "").replace(/\/$/, "");
 const AUTH_TOKEN_URL = AUTH_URL ? `${AUTH_URL}/connect/token` : "/connect/token";
-const AUTH_CLIENT_ID = (import.meta as any).env?.VITE_AUTH_CLIENT_ID || "H_Purchases_App";
+const AUTH_CLIENT_ID = (import.meta as any).env?.VITE_AUTH_CLIENT_ID || "H_Sales_App";
 const AUTH_SCOPE =
   (import.meta as any).env?.VITE_AUTH_SCOPE ||
-  "H.Purchases H.Platform openid profile email roles offline_access";
+  "H.Sales H.Platform openid profile email roles offline_access";
 
-const TOKEN_KEY = "softplan_pu_token";
-const PKCE_KEY = "softplan_pu_pkce";
-const TENANT_KEY = "softplan_pu_tenant";
-const USER_KEY = "softplan_pu_user";
+const TOKEN_KEY = "softplan_sal_token";
+const PKCE_KEY = "softplan_sal_pkce";
+const TENANT_KEY = "softplan_sal_tenant";
+const USER_KEY = "softplan_sal_user";
 const SESSION_EXPIRED_EVENT = "softplan:session-expired";
 
 type SessionExpiredListener = () => void;
