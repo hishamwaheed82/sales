@@ -1,9 +1,9 @@
 ﻿import { useState } from "react";
-import { Wallet, Eye, EyeOff } from "lucide-react";
+import { ShoppingBag, Eye, EyeOff } from "lucide-react";
 
 export function LoginScreen({
   onLogin,
-  appName = "نظام الخزينة",
+  appName = "نظام المبيعات",
 }: {
   onLogin: (creds: { username: string; password: string; tenantCode?: string }) => Promise<void>;
   appName?: string;
@@ -41,15 +41,14 @@ export function LoginScreen({
         background: "linear-gradient(160deg, #0B1A2E 0%, #122846 45%, #0D2340 100%)"
       }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8">
-        {/* Logo */}
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 animate-page-in">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
-            <Wallet size={28} className="text-white" />
+          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mb-3 shadow-lg">
+            <ShoppingBag size={28} className="text-white" />
           </div>
           <p className="text-xs text-gray-400 tracking-widest uppercase">Soft Plan</p>
           <h1 className="mt-1 text-lg font-bold text-gray-800">{appName}</h1>
-          <p className="text-xs text-emerald-700 mt-1 font-medium">Treasury</p>
+          <p className="text-xs text-blue-700 mt-1 font-medium">Sales</p>
         </div>
 
         {error && (
@@ -67,7 +66,7 @@ export function LoginScreen({
               onChange={(e) => setUsername(e.target.value)}
               autoFocus
               autoComplete="username"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="admin أو user@example.com"
             />
           </div>
@@ -80,7 +79,7 @@ export function LoginScreen({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent pl-9"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pl-9"
               />
               <button
                 type="button"
@@ -98,7 +97,7 @@ export function LoginScreen({
               type="text"
               value={tenantCode}
               onChange={(e) => setTenantCode(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="مثال: ALMAALY"
             />
           </div>
@@ -106,14 +105,14 @@ export function LoginScreen({
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors mt-2"
+            className="w-full bg-blue-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors mt-2"
           >
             {loading ? "جاري الدخول…" : "دخول"}
           </button>
         </form>
 
         <p className="mt-6 text-center text-xs text-gray-400">
-          © {new Date().getFullYear()} Soft Plan — Treasury
+          © {new Date().getFullYear()} Soft Plan — Sales
         </p>
       </div>
     </div>
