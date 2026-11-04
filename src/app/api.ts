@@ -78,46 +78,46 @@ export type SessionTenant = {
   city?: string;
 };
 
-// ── Purchases DTOs ───────────────────────────────────────────────────────────
+// ── Sales DTOs ───────────────────────────────────────────────────────────────
 
-export type SupplierDto = {
+export type CustomerDto = {
   id: string;
   code: string;
   name: string;
   isActive: boolean;
 };
 
-export type CreateUpdateSupplierDto = {
+export type CreateUpdateCustomerDto = {
   code: string;
   name: string;
   isActive?: boolean;
 };
 
-export type PurchaseInvoiceLineDto = {
+export type SalesInvoiceLineDto = {
   id?: string;
   lineNumber: number;
   itemId?: string | null;
   description?: string;
   qty: number;
-  unitCost: number;
+  unitPrice: number;
   lineTotal: number;
 };
 
-export type CreatePurchaseInvoiceLineDto = {
+export type CreateSalesInvoiceLineDto = {
   itemId?: string;
   description?: string;
   qty: number;
-  unitCost: number;
+  unitPrice: number;
 };
 
 /** Status: 1=Draft, 2=Posted */
-export type PurchaseInvoiceDto = {
+export type SalesInvoiceDto = {
   id: string;
   number: string;
   docDate: string;
-  supplierId: string;
-  supplierCode?: string;
-  supplierName?: string;
+  customerId: string;
+  customerCode?: string;
+  customerName?: string;
   warehouseId?: string | null;
   status: number;
   subTotal: number;
@@ -125,21 +125,38 @@ export type PurchaseInvoiceDto = {
   grandTotal: number;
   journalNumber?: string;
   stockDocumentId?: string;
-  lines: PurchaseInvoiceLineDto[];
+  lines: SalesInvoiceLineDto[];
 };
 
-export type CreatePurchaseInvoiceDto = {
+export type CreateSalesInvoiceDto = {
   docDate?: string;
-  supplierId: string;
+  customerId: string;
   warehouseId?: string;
   taxTotal?: number;
   post?: boolean;
-  lines: CreatePurchaseInvoiceLineDto[];
+  lines: CreateSalesInvoiceLineDto[];
+};
+
+export type WarehouseLookupDto = {
+  id: string;
+  code: string;
+  name: string;
+  isDefault: boolean;
+  isActive: boolean;
+};
+
+export type ItemLookupDto = {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
 };
 
 export type BootstrapDto = {
-  suppliers: SupplierDto[];
-  recentInvoices: PurchaseInvoiceDto[];
+  customers: CustomerDto[];
+  recentInvoices: SalesInvoiceDto[];
+  warehouses?: WarehouseLookupDto[];
+  items?: ItemLookupDto[];
 };
 
 // ── Auth helpers ─────────────────────────────────────────────────────────────
@@ -499,21 +516,21 @@ export const api = {
     return { ok: true, tenant };
   },
 
-  // ── Purchases endpoints (/api/v1/...) ───────────────────────────────────────
+  // ── Sales endpoints (/api/v1/...) ───────────────────────────────────────────
 
   bootstrap: () => request<BootstrapDto>("/bootstrap"),
 
-  getSuppliers: () => request<SupplierDto[]>("/suppliers"),
-  createSupplier: (body: CreateUpdateSupplierDto) =>
-    request<SupplierDto>("/suppliers", { method: "POST", body: JSON.stringify(body) }),
-  updateSupplier: (id: string, body: CreateUpdateSupplierDto) =>
-    request<SupplierDto>(`/suppliers/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  getCustomers: () => request<CustomerDto[]>("/customers"),
+  createCustomer: (body: CreateUpdateCustomerDto) =>
+    request<CustomerDto>("/customers", { method: "POST", body: JSON.stringify(body) }),
+  updateCustomer: (id: string, body: CreateUpdateCustomerDto) =>
+    request<CustomerDto>(`/customers/${id}`, { method: "PUT", body: JSON.stringify(body) }),
 
-  getInvoices: () => request<PurchaseInvoiceDto[]>("/invoices"),
-  createInvoice: (body: CreatePurchaseInvoiceDto) =>
-    request<PurchaseInvoiceDto>("/invoices", { method: "POST", body: JSON.stringify(body) }),
+  getInvoices: () => request<SalesInvoiceDto[]>("/invoices"),
+  createInvoice: (body: CreateSalesInvoiceDto) =>
+    request<SalesInvoiceDto>("/invoices", { method: "POST", body: JSON.stringify(body) }),
   postInvoice: (id: string) =>
-    request<PurchaseInvoiceDto>(`/invoices/${id}/post`, { method: "POST" }),
+    request<SalesInvoiceDto>(`/invoices/${id}/post`, { method: "POST" }),
 };
 
 export { API_BASE };
