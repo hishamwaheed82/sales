@@ -154,6 +154,8 @@ export type ItemLookupDto = {
   code: string;
   name: string;
   isActive: boolean;
+  salePrice: number;
+  costPrice: number;
 };
 
 export type BootstrapDto = {

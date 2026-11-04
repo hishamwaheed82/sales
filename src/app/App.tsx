@@ -942,6 +942,9 @@ function InvoicesPage({
                             ...l,
                             itemId: id,
                             description: l.description || (item ? item.name : ""),
+                            unitPrice: (item && (parseFloat(l.unitPrice) === 0 || l.unitPrice === "" || l.unitPrice === "0"))
+                              ? String(item.salePrice)
+                              : l.unitPrice,
                           } : l));
                         }}
                         className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
