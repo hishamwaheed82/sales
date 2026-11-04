@@ -1,6 +1,4 @@
 # Sales frontend (Vite/React) -> sales.soft-planning.com (Plesk, Web Deploy)
-#   build  : every push / PR on main
-#   deploy : manual "Run workflow" only, from main
 name: Sales UI CI/CD
 
 on:
@@ -40,7 +38,7 @@ jobs:
         shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WD_SERVER) -or [string]::IsNullOrWhiteSpace($env:WD_SITE) -or [string]::IsNullOrWhiteSpace($env:WD_PASSWORD)) {
-            Write-Host "::warning::WEBDEPLOY_* secrets missing — build OK, deploy skipped. Copy WEBDEPLOY_SERVER/SITE/USERNAME/PASSWORD from account/portal repo secrets."
+            Write-Host "::warning::WEBDEPLOY_* secrets missing — build OK, deploy skipped."
             exit 0
           }
           $msdeploy = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
@@ -67,103 +65,20 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         shell: pwsh
         run: |
-          # Smoke test skip when WebDeploy secrets missing or DNS not ready yet
           if ([string]::IsNullOrWhiteSpace($env:WD_SERVER) -or [string]::IsNullOrWhiteSpace($env:WD_SITE)) {
-            Write-Host "::warning::Smoke skipped — WEBDEPLOY secrets missing / site not provisioned yet."
+            Write-Host "::warning::Smoke skipped — WEBDEPLOY secrets missing / site not provisioned."
             exit 0
           }
           Start-Sleep -Seconds 5
           try {
-            $uri = if ($env:SMOKE_URL) { $env:SMOKE_URL } else { "https://$($env:WD_SITE)/" }
-            $r = Invoke-WebRequest -Uri $uri -UseBasicParsing
+            $r = Invoke-WebRequest -Uri "https://sales.soft-planning.com/" -UseBasicParsing
             if ($r.StatusCode -ne 200) { throw "site returned $($r.StatusCode)" }
           } catch {
-            Write-Host "::warning::Smoke failed (site may not exist yet): # Sales frontend (Vite/React) -> sales.soft-planning.com (Plesk, Web Deploy)
-#   build  : every push / PR on main
-#   deploy : manual "Run workflow" only, from main
-name: Sales UI CI/CD
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-
-concurrency:
-  group: sales-ui-${{ github.ref }}
-  cancel-in-progress: false
-
-permissions:
-  contents: read
-
-jobs:
-  build:
-    name: Build
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Build (production settings are public, not secrets)
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: https://sales-api.soft-planning.com/api/v1
-          VITE_AUTH_URL: https://auth.soft-planning.com
-          VITE_AUTH_CLIENT_ID: H_Sales_App
-          VITE_AUTH_SCOPE: H.Sales H.Platform openid profile email roles offline_access
-      - name: Web Deploy
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:WD_SERVER) -or [string]::IsNullOrWhiteSpace($env:WD_SITE) -or [string]::IsNullOrWhiteSpace($env:WD_PASSWORD)) {
-            Write-Host "::warning::WEBDEPLOY_* secrets missing — build OK, deploy skipped. Copy WEBDEPLOY_SERVER/SITE/USERNAME/PASSWORD from account/portal repo secrets."
-            exit 0
-          }
-          $msdeploy = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
-          if (-not (Test-Path $msdeploy)) { choco install webdeploy -y --no-progress }
-          if (-not (Test-Path $msdeploy)) { throw "msdeploy.exe not found" }
-          $src = (Resolve-Path dist).Path
-          $msArgs = @(
-            '-verb:sync',
-            "-source:contentPath=$src",
-            "-dest:contentPath=$env:WD_SITE,computerName=https://${env:WD_SERVER}:8172/msdeploy.axd?site=$env:WD_SITE,userName=$env:WD_USER,password=$env:WD_PASSWORD,authType=Basic",
-            '-enableRule:DoNotDeleteRule',
-            '-allowUntrusted',
-            '-verbose'
-          )
-          & $msdeploy @msArgs 2>&1 | ForEach-Object { if ($env:WD_PASSWORD) { "$_".Replace($env:WD_PASSWORD, '***') } else { "$_" } }
-          if ($LASTEXITCODE -ne 0) { throw "msdeploy failed ($LASTEXITCODE)" }
-        env:
-          WD_SERVER: ${{ secrets.WEBDEPLOY_SERVER }}
-          WD_SITE: ${{ secrets.WEBDEPLOY_SITE }}
-          WD_USER: ${{ secrets.WEBDEPLOY_USERNAME }}
-          WD_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
-        working-directory: ${{ github.workspace }}
-      - name: Smoke test
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          Start-Sleep -Seconds 5
-          $r = Invoke-WebRequest -Uri "https://sales.soft-planning.com/" -UseBasicParsing
-          if ($r.StatusCode -ne 200) { throw "site returned $($r.StatusCode)" }
-        env:
-          WD_SERVER: ${{ secrets.WEBDEPLOY_SERVER }}
-          WD_SITE: ${{ secrets.WEBDEPLOY_SITE }}
-          WD_USER: ${{ secrets.WEBDEPLOY_USERNAME }}
-          WD_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
-        working-directory: ${{ github.workspace }}
-    environment: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') && 'production' || '' }}
-"
+            Write-Host "::warning::Smoke failed (site may not exist yet): $_"
             exit 0
           }
         env:
           WD_SERVER: ${{ secrets.WEBDEPLOY_SERVER }}
           WD_SITE: ${{ secrets.WEBDEPLOY_SITE }}
-          WD_USER: ${{ secrets.WEBDEPLOY_USERNAME }}
-          WD_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
         working-directory: ${{ github.workspace }}
     environment: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') && 'production' || '' }}
