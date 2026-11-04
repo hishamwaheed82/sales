@@ -84,12 +84,16 @@ export type CustomerDto = {
   id: string;
   code: string;
   name: string;
+  phone?: string | null;
+  email?: string | null;
   isActive: boolean;
 };
 
 export type CreateUpdateCustomerDto = {
   code: string;
   name: string;
+  phone?: string | null;
+  email?: string | null;
   isActive?: boolean;
 };
 
@@ -110,7 +114,7 @@ export type CreateSalesInvoiceLineDto = {
   unitPrice: number;
 };
 
-/** Status: 1=Draft, 2=Posted */
+/** Status: 1=Draft, 2=Posted, 3=Cancelled */
 export type SalesInvoiceDto = {
   id: string;
   number: string;
@@ -531,6 +535,8 @@ export const api = {
     request<SalesInvoiceDto>("/invoices", { method: "POST", body: JSON.stringify(body) }),
   postInvoice: (id: string) =>
     request<SalesInvoiceDto>(`/invoices/${id}/post`, { method: "POST" }),
+  cancelInvoice: (id: string) =>
+    request<SalesInvoiceDto>(`/invoices/${id}/cancel`, { method: "POST" }),
 };
 
 export { API_BASE };

@@ -29,10 +29,12 @@ type Page = "dashboard" | "customers" | "invoices";
 const DOC_STATUS_LABEL: Record<number, string> = {
   1: "مسودة",
   2: "مرحّل",
+  3: "ملغى",
 };
 const DOC_STATUS_COLOR: Record<number, string> = {
   1: "bg-yellow-100 text-yellow-800",
   2: "bg-green-100 text-green-800",
+  3: "bg-red-100 text-red-700",
 };
 
 const fmt = (n: number) => n.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -321,7 +323,7 @@ function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
 function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onRefresh: () => void }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ code: "", name: "" });
+  const [form, setForm] = useState({ code: "", name: "", phone: "", email: "" });
 
   const handleSave = async () => {
     if (!form.code.trim() || !form.name.trim()) {
@@ -331,13 +333,15 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
     setSaving(true);
     try {
       await api.createCustomer({
-        code: form.code.trim(),
-        name: form.name.trim(),
+        code:  form.code.trim(),
+        name:  form.name.trim(),
+        phone: form.phone.trim() || undefined,
+        email: form.email.trim() || undefined,
         isActive: true,
       });
       toast.success("تم إضافة العميل بنجاح.");
       setShowForm(false);
-      setForm({ code: "", name: "" });
+      setForm({ code: "", name: "", phone: "", email: "" });
       onRefresh();
     } catch (err: any) {
       toast.error(err.message || "فشل حفظ العميل.");
@@ -377,6 +381,21 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">الهاتف (Phone)</label>
+                <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="اختياري — مثال: 0100xxxxxxx"
+                  maxLength={32}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">البريد الإلكتروني (Email)</label>
+                <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="اختياري — مثال: info@example.com"
+                  type="email"
+                  maxLength={128}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">إلغاء</button>
@@ -404,6 +423,16 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
               <div className="flex-1">
                 <div className="font-semibold text-gray-800">{s.name}</div>
                 <div className="text-xs text-gray-400 mt-0.5 font-mono">{s.code}</div>
+                {s.phone && (
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    <span className="text-gray-400">📞</span> {s.phone}
+                  </div>
+                )}
+                {s.email && (
+                  <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1 truncate">
+                    <span className="text-gray-400">✉</span> {s.email}
+                  </div>
+                )}
                 <div className={`mt-2 text-xs ${s.isActive ? "text-green-600" : "text-gray-400"}`}>
                   {s.isActive ? "نشط" : "موقوف"}
                 </div>
@@ -436,6 +465,7 @@ function InvoicesPage({
 
   const [showForm, setShowForm] = useState(false);
   const [posting, setPosting] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({
@@ -485,6 +515,20 @@ function InvoicesPage({
       toast.error(err.message || "فشل الترحيل.");
     } finally {
       setPosting(null);
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    if (!confirm("هل أنت متأكد من إلغاء هذه الفاتورة؟")) return;
+    setCancelling(id);
+    try {
+      await api.cancelInvoice(id);
+      toast.success("تم إلغاء الفاتورة بنجاح.");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "فشل إلغاء الفاتورة.");
+    } finally {
+      setCancelling(null);
     }
   };
 
@@ -768,14 +812,24 @@ function InvoicesPage({
                     <td className="px-4 py-2 font-mono text-xs text-gray-500">{v.journalNumber ?? "—"}</td>
                     <td className="px-4 py-2">
                       {v.status === 1 && (
-                        <button
-                          onClick={() => handlePost(v.id)}
-                          disabled={posting === v.id}
-                          className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 disabled:opacity-50"
-                        >
-                          {posting === v.id ? <RefreshCw size={12} className="animate-spin" /> : <Check size={12} />}
-                          ترحيل
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handlePost(v.id)}
+                            disabled={posting === v.id || cancelling === v.id}
+                            className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 disabled:opacity-50"
+                          >
+                            {posting === v.id ? <RefreshCw size={12} className="animate-spin" /> : <Check size={12} />}
+                            ترحيل
+                          </button>
+                          <button
+                            onClick={() => handleCancel(v.id)}
+                            disabled={posting === v.id || cancelling === v.id}
+                            className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                          >
+                            {cancelling === v.id ? <RefreshCw size={12} className="animate-spin" /> : <X size={12} />}
+                            إلغاء
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
