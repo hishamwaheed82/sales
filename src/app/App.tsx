@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Users, FileText,
   ChevronLeft, Bell, User, LogOut, Plus, Check, X,
   RefreshCw, Search, Menu, TrendingUp, ShoppingBag, Trash2, Warehouse,
+  Printer,
 } from "lucide-react";
 import {
   api,
@@ -446,9 +447,249 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Invoices (create + post)
+// Invoices (create + post + detail drawer)
 // ─────────────────────────────────────────────────────────────────────────────
 type LineDraft = { itemId: string; description: string; qty: string; unitPrice: string };
+
+function warehouseLabel(
+  warehouseId: string | null | undefined,
+  warehouses: WarehouseLookupDto[],
+): string {
+  if (!warehouseId) return "—";
+  const wh = warehouses.find((w) => w.id === warehouseId);
+  return wh ? `${wh.name} (${wh.code})` : warehouseId;
+}
+
+function printInvoice(inv: SalesInvoiceDto, warehouseText: string) {
+  const linesHtml = (inv.lines ?? [])
+    .map(
+      (l) => `<tr>
+        <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right">${l.lineNumber}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right">${l.description ?? "—"}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right">${l.qty}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right">${fmt(l.unitPrice)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right">${fmt(l.lineTotal)}</td>
+      </tr>`,
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"/>
+    <title>فاتورة ${inv.number}</title>
+    <style>
+      body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#111;padding:24px;direction:rtl}
+      h1{font-size:18px;margin:0 0 16px}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;font-size:13px;margin-bottom:20px}
+      .meta span{color:#666}
+      table{width:100%;border-collapse:collapse;font-size:13px}
+      th{background:#f3f4f6;padding:8px;text-align:right;border-bottom:2px solid #ccc}
+      .totals{margin-top:16px;font-size:13px;text-align:left}
+      .totals div{margin:4px 0}
+      .grand{font-weight:700;font-size:15px}
+    </style></head><body>
+    <h1>فاتورة بيع — ${inv.number}</h1>
+    <div class="meta">
+      <div><span>العميل:</span> ${inv.customerName ?? inv.customerCode ?? "—"}</div>
+      <div><span>التاريخ:</span> ${new Date(inv.docDate).toLocaleDateString("ar-EG")}</div>
+      <div><span>الحالة:</span> ${DOC_STATUS_LABEL[inv.status] ?? inv.status}</div>
+      <div><span>المستودع:</span> ${warehouseText}</div>
+      <div><span>قيد GL:</span> ${inv.journalNumber ?? "—"}</div>
+      <div><span>Stock Document:</span> ${inv.stockDocumentId ?? "—"}</div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>#</th><th>الوصف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th>
+      </tr></thead>
+      <tbody>${linesHtml || `<tr><td colspan="5" style="padding:12px;text-align:center;color:#999">لا توجد أسطر</td></tr>`}</tbody>
+    </table>
+    <div class="totals">
+      <div>الإجمالي الفرعي: ${fmt(inv.subTotal)}</div>
+      <div>الضريبة: ${fmt(inv.taxTotal)}</div>
+      <div class="grand">الإجمالي: ${fmt(inv.grandTotal)}</div>
+    </div>
+    <script>window.onload=function(){window.print();}</script>
+    </body></html>`;
+
+  const w = window.open("", "_blank", "noopener,noreferrer,width=860,height=720");
+  if (!w) {
+    toast.error("تعذر فتح نافذة الطباعة — تحقق من إعدادات المتصفح.");
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+function InvoiceDetailDrawer({
+  invoice,
+  warehouses,
+  posting,
+  cancelling,
+  onClose,
+  onPost,
+  onCancel,
+  onPrint,
+}: {
+  invoice: SalesInvoiceDto;
+  warehouses: WarehouseLookupDto[];
+  posting: boolean;
+  cancelling: boolean;
+  onClose: () => void;
+  onPost: () => void;
+  onCancel: () => void;
+  onPrint: () => void;
+}) {
+  const whText = warehouseLabel(invoice.warehouseId, warehouses);
+  const isDraft = invoice.status === 1;
+  const lines = invoice.lines ?? [];
+
+  return (
+    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40 border-0 cursor-default"
+        aria-label="إغلاق"
+        onClick={onClose}
+      />
+      <aside className="absolute inset-y-0 right-0 z-10 flex h-full w-full max-w-lg flex-col bg-white shadow-2xl border-l border-gray-200 animate-drawer-in animate-page-in">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">تفاصيل الفاتورة</h2>
+            <p className="mt-0.5 font-mono text-xs text-blue-700">{invoice.number}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <DetailField label="العميل" value={invoice.customerName ?? invoice.customerCode ?? "—"} />
+            <DetailField label="التاريخ" value={new Date(invoice.docDate).toLocaleDateString("ar-EG")} />
+            <div>
+              <div className="text-xs text-gray-500 mb-1">الحالة</div>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${DOC_STATUS_COLOR[invoice.status] ?? "bg-gray-100"}`}>
+                {DOC_STATUS_LABEL[invoice.status] ?? invoice.status}
+              </span>
+            </div>
+            <DetailField label="المستودع" value={whText} />
+            <DetailField label="قيد GL" value={invoice.journalNumber ?? "—"} mono />
+            <DetailField label="Stock Document" value={invoice.stockDocumentId ?? "—"} mono />
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">الأسطر</h3>
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2 text-right">#</th>
+                    <th className="px-3 py-2 text-right">الوصف</th>
+                    <th className="px-3 py-2 text-right">الكمية</th>
+                    <th className="px-3 py-2 text-right">السعر</th>
+                    <th className="px-3 py-2 text-right">الإجمالي</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {lines.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-center text-gray-400">لا توجد أسطر</td>
+                    </tr>
+                  ) : (
+                    lines.map((l) => (
+                      <tr key={l.id ?? l.lineNumber}>
+                        <td className="px-3 py-2 text-gray-500">{l.lineNumber}</td>
+                        <td className="px-3 py-2">{l.description ?? "—"}</td>
+                        <td className="px-3 py-2">{l.qty}</td>
+                        <td className="px-3 py-2">{fmt(l.unitPrice)}</td>
+                        <td className="px-3 py-2 font-medium">{fmt(l.lineTotal)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-gray-50 px-4 py-3 space-y-1.5 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>الإجمالي الفرعي</span>
+              <span>{fmt(invoice.subTotal)}</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>الضريبة</span>
+              <span>{fmt(invoice.taxTotal)}</span>
+            </div>
+            <div className="flex justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200">
+              <span>الإجمالي</span>
+              <span>{fmt(invoice.grandTotal)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 px-5 py-3">
+          <button
+            type="button"
+            onClick={onPrint}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Printer size={14} />
+            طباعة
+          </button>
+          {isDraft && (
+            <>
+              <button
+                type="button"
+                onClick={onPost}
+                disabled={posting || cancelling}
+                className="flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {posting ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                ترحيل
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={posting || cancelling}
+                className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100 disabled:opacity-50"
+              >
+                {cancelling ? <RefreshCw size={14} className="animate-spin" /> : <X size={14} />}
+                إلغاء
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="mr-auto rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+          >
+            إغلاق
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function DetailField({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-xs text-gray-500 mb-1">{label}</div>
+      <div className={`text-sm text-gray-800 break-all ${mono ? "font-mono text-xs" : ""}`}>{value}</div>
+    </div>
+  );
+}
 
 function InvoicesPage({
   invoices, customers, warehouses, items, onRefresh
@@ -464,6 +705,7 @@ function InvoicesPage({
     ?? "";
 
   const [showForm, setShowForm] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [posting, setPosting] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -479,6 +721,9 @@ function InvoicesPage({
   const [lines, setLines] = useState<LineDraft[]>([
     { itemId: "", description: "", qty: "1", unitPrice: "0" },
   ]);
+
+  const selectedInvoice =
+    (selectedId && invoices.find((v) => v.id === selectedId)) || null;
 
   const openForm = () => {
     setForm({
@@ -592,7 +837,7 @@ function InvoicesPage({
   const activeWarehouses = warehouses.filter(w => w.isActive);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-page-in">
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -798,7 +1043,13 @@ function InvoicesPage({
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((v) => (
-                  <tr key={v.id} className="hover:bg-gray-50">
+                  <tr
+                    key={v.id}
+                    onClick={() => setSelectedId(v.id)}
+                    className={`hover:bg-blue-50/60 cursor-pointer transition-colors ${
+                      selectedId === v.id ? "bg-blue-50" : ""
+                    }`}
+                  >
                     <td className="px-4 py-2 font-mono text-xs text-blue-700">{v.number}</td>
                     <td className="px-4 py-2">{v.customerName ?? v.customerCode ?? "—"}</td>
                     <td className="px-4 py-2 font-medium">{fmt(v.grandTotal)}</td>
@@ -810,7 +1061,7 @@ function InvoicesPage({
                       </span>
                     </td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-500">{v.journalNumber ?? "—"}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>
                       {v.status === 1 && (
                         <div className="flex items-center gap-2">
                           <button
@@ -839,6 +1090,21 @@ function InvoicesPage({
           </div>
         )}
       </div>
+
+      {selectedInvoice && (
+        <InvoiceDetailDrawer
+          invoice={selectedInvoice}
+          warehouses={warehouses}
+          posting={posting === selectedInvoice.id}
+          cancelling={cancelling === selectedInvoice.id}
+          onClose={() => setSelectedId(null)}
+          onPost={() => handlePost(selectedInvoice.id)}
+          onCancel={() => handleCancel(selectedInvoice.id)}
+          onPrint={() =>
+            printInvoice(selectedInvoice, warehouseLabel(selectedInvoice.warehouseId, warehouses))
+          }
+        />
+      )}
     </div>
   );
 }
