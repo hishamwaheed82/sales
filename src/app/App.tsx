@@ -288,6 +288,7 @@ function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
                 <th className="px-4 py-2 text-right">العميل</th>
                 <th className="px-4 py-2 text-right">الإجمالي</th>
                 <th className="px-4 py-2 text-right">التاريخ</th>
+                <th className="px-4 py-2 text-right">قيد GL</th>
                 <th className="px-4 py-2 text-right">الحالة</th>
               </tr>
             </thead>
@@ -298,6 +299,7 @@ function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
                   <td className="px-4 py-2">{v.customerName ?? v.customerCode ?? "—"}</td>
                   <td className="px-4 py-2 font-medium">{fmt(v.grandTotal)}</td>
                   <td className="px-4 py-2 text-gray-500">{new Date(v.docDate).toLocaleDateString("ar-EG")}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-gray-500">{v.journalNumber ?? "—"}</td>
                   <td className="px-4 py-2">
                     <span className={`px-2 py-0.5 rounded-full text-xs ${DOC_STATUS_COLOR[v.status] ?? "bg-gray-100"}`}>
                       {DOC_STATUS_LABEL[v.status] ?? v.status}
@@ -746,6 +748,7 @@ function InvoicesPage({
                   <th className="px-4 py-2 text-right">الضريبة</th>
                   <th className="px-4 py-2 text-right">التاريخ</th>
                   <th className="px-4 py-2 text-right">الحالة</th>
+                  <th className="px-4 py-2 text-right">قيد GL</th>
                   <th className="px-4 py-2 text-right">إجراء</th>
                 </tr>
               </thead>
@@ -762,6 +765,7 @@ function InvoicesPage({
                         {DOC_STATUS_LABEL[v.status] ?? v.status}
                       </span>
                     </td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-500">{v.journalNumber ?? "—"}</td>
                     <td className="px-4 py-2">
                       {v.status === 1 && (
                         <button
