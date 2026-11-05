@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Inbox, Loader2, X } from "lucide-react";
 
 /** Sticky page header + optional actions — use on list/report pages without redesigning them. */
@@ -70,8 +70,8 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel = "تأكيد",
+  cancelLabel = "إلغاء",
   danger,
   busy,
   onConfirm,
@@ -94,13 +94,16 @@ export function ConfirmDialog({
         className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-page-in"
         onClick={(e) => e.stopPropagation()}
         role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby="confirm-dialog-message"
       >
         <div className="px-5 py-4 border-b border-[#E0E8F4] flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-[#0D1B2E]">{title}</h3>
-            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{message}</p>
+            <h3 id="confirm-dialog-title" className="text-sm font-bold text-[#0D1B2E]">{title}</h3>
+            <p id="confirm-dialog-message" className="text-xs text-slate-500 mt-1.5 leading-relaxed">{message}</p>
           </div>
-          <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={onCancel} aria-label="إغلاق" className="text-slate-400 hover:text-slate-600">
             <X size={16} />
           </button>
         </div>

@@ -1,10 +1,10 @@
-﻿import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Toaster, toast } from "sonner";
 import {
   LayoutDashboard, Users, FileText,
   ChevronLeft, Bell, User, LogOut, Plus, Check, X,
   RefreshCw, Search, Menu, TrendingUp, ShoppingBag, Trash2, Warehouse,
-  Printer,
+  Printer, Ban,
 } from "lucide-react";
 import {
   api,
@@ -176,13 +176,16 @@ export default function App() {
           </h1>
           <div className="mr-auto flex items-center gap-2">
             <button
+              type="button"
               onClick={loadBootstrap}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              disabled={loading}
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
               title="تحديث البيانات"
+              aria-label="تحديث البيانات"
             >
               <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             </button>
-            <button className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
+            <button type="button" disabled title="الإشعارات — قريبًا" aria-label="الإشعارات — قريبًا" className="p-1.5 text-gray-400 rounded-lg cursor-not-allowed opacity-60">
               <Bell size={16} />
             </button>
             <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -192,6 +195,11 @@ export default function App() {
           </div>
         </header>
 
+        {loading && bootstrap ? (
+          <div className="h-0.5 w-full bg-blue-100 overflow-hidden">
+            <div className="h-full w-1/3 bg-blue-500 animate-pulse" />
+          </div>
+        ) : null}
         <div className="flex-1 overflow-y-auto p-5">
           {loading && !bootstrap ? (
             <div className="flex items-center justify-center h-40 gap-3 text-gray-500">
@@ -200,7 +208,13 @@ export default function App() {
             </div>
           ) : (
             <>
-              {page === "dashboard" && <DashboardPage bootstrap={bootstrap} />}
+              {page === "dashboard" && (
+                <DashboardPage
+                  bootstrap={bootstrap}
+                  onOpenInvoices={() => setPage("invoices")}
+                  onOpenCustomers={() => setPage("customers")}
+                />
+              )}
               {page === "customers" && (
                 <CustomersPage
                   customers={bootstrap?.customers ?? []}
@@ -228,7 +242,15 @@ export default function App() {
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard
 // ─────────────────────────────────────────────────────────────────────────────
-function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
+function DashboardPage({
+  bootstrap,
+  onOpenInvoices,
+  onOpenCustomers,
+}: {
+  bootstrap: BootstrapDto | null;
+  onOpenInvoices?: () => void;
+  onOpenCustomers?: () => void;
+}) {
   if (!bootstrap) return null;
 
   const draftCount = bootstrap.recentInvoices.filter((v) => v.status === 1).length;
@@ -236,30 +258,40 @@ function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
     .filter((v) => v.status === 2)
     .reduce((s, v) => s + (v.grandTotal || 0), 0);
 
-  const cards = [
+  const cards: {
+    title: string;
+    value: string;
+    icon: React.ReactNode;
+    bg: string;
+    onClick?: () => void;
+  }[] = [
     {
       title: "العملاء",
       value: bootstrap.customers.length.toLocaleString("ar-EG"),
       icon: <Users size={22} className="text-blue-500" />,
       bg: "bg-blue-50",
+      onClick: onOpenCustomers,
     },
     {
       title: "فواتير المسودة",
       value: draftCount.toLocaleString("ar-EG"),
       icon: <FileText size={22} className="text-yellow-500" />,
       bg: "bg-yellow-50",
+      onClick: onOpenInvoices,
     },
     {
       title: "إجمالي المرحّل",
       value: fmt(postedTotal),
       icon: <TrendingUp size={22} className="text-green-500" />,
       bg: "bg-green-50",
+      onClick: onOpenInvoices,
     },
     {
       title: "آخر الفواتير",
       value: bootstrap.recentInvoices.length.toLocaleString("ar-EG"),
       icon: <ShoppingBag size={22} className="text-indigo-500" />,
       bg: "bg-indigo-50",
+      onClick: onOpenInvoices,
     },
   ];
 
@@ -267,7 +299,14 @@ function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((c) => (
-          <div key={c.title} className={`${c.bg} rounded-xl p-5 flex items-center gap-4`}>
+          <div
+            key={c.title}
+            className={`${c.bg} rounded-xl p-5 flex items-center gap-4 ${c.onClick ? "cursor-pointer hover:brightness-[0.98] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" : ""}`}
+            onClick={c.onClick}
+            role={c.onClick ? "button" : undefined}
+            tabIndex={c.onClick ? 0 : undefined}
+            onKeyDown={c.onClick ? (e) => { if (e.key === "Enter" || e.key === " ") c.onClick?.(); } : undefined}
+          >
             <div className="p-2 bg-white rounded-lg shadow-sm">{c.icon}</div>
             <div>
               <p className="text-xs text-gray-500 mb-0.5">{c.title}</p>
@@ -297,8 +336,12 @@ function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {bootstrap.recentInvoices.slice(0, 8).map((v) => (
-                <tr key={v.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-mono text-xs">{v.number}</td>
+                <tr
+                  key={v.id}
+                  className={`hover:bg-gray-50 ${onOpenInvoices ? "cursor-pointer" : ""}`}
+                  onClick={onOpenInvoices}
+                >
+                  <td className="px-4 py-2 font-mono text-xs text-blue-700">{v.number}</td>
                   <td className="px-4 py-2">{v.customerName ?? v.customerCode ?? "—"}</td>
                   <td className="px-4 py-2 font-medium">{fmt(v.grandTotal)}</td>
                   <td className="px-4 py-2 text-gray-500">{new Date(v.docDate).toLocaleDateString("ar-EG")}</td>
@@ -321,10 +364,20 @@ function DashboardPage({ bootstrap }: { bootstrap: BootstrapDto | null }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Customers
 // ─────────────────────────────────────────────────────────────────────────────
-function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onRefresh: () => void }) {
+function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onRefresh: () => void | Promise<void> }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ code: "", name: "", phone: "", email: "" });
+
+  useEffect(() => {
+    if (!showForm) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setShowForm(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showForm]);
 
   const handleSave = async () => {
     if (!form.code.trim() || !form.name.trim()) {
@@ -343,7 +396,7 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
       toast.success("تم إضافة العميل بنجاح.");
       setShowForm(false);
       setForm({ code: "", name: "", phone: "", email: "" });
-      onRefresh();
+      await onRefresh();
     } catch (err: any) {
       toast.error(err.message || "فشل حفظ العميل.");
     } finally {
@@ -365,11 +418,11 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog" aria-modal="true" aria-labelledby="sales-cust-form-title">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">إضافة عميل جديد</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              <h2 id="sales-cust-form-title" className="font-semibold text-gray-800">إضافة عميل جديد</h2>
+              <button onClick={() => setShowForm(false)} aria-label="إغلاق" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="space-y-3">
               <div>
@@ -383,14 +436,14 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">الهاتف (Phone)</label>
+                <label className="text-xs text-gray-500 mb-1 block">الهاتف</label>
                 <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                   placeholder="اختياري — مثال: 0100xxxxxxx"
                   maxLength={32}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">البريد الإلكتروني (Email)</label>
+                <label className="text-xs text-gray-500 mb-1 block">البريد الإلكتروني</label>
                 <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="اختياري — مثال: info@example.com"
                   type="email"
@@ -399,8 +452,8 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">إلغاء</button>
-              <button onClick={handleSave} disabled={saving}
+              <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">إلغاء</button>
+              <button type="button" onClick={handleSave} disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
                 حفظ
@@ -493,7 +546,7 @@ function printInvoice(inv: SalesInvoiceDto, warehouseText: string) {
       <div><span>الحالة:</span> ${DOC_STATUS_LABEL[inv.status] ?? inv.status}</div>
       <div><span>المستودع:</span> ${warehouseText}</div>
       <div><span>قيد GL:</span> ${inv.journalNumber ?? "—"}</div>
-      <div><span>Stock Document:</span> ${inv.stockDocumentId ?? "—"}</div>
+      <div><span>مستند المخزون:</span> ${inv.stockDocumentId ?? "—"}</div>
     </div>
     <table>
       <thead><tr>
@@ -528,6 +581,7 @@ function InvoiceDetailDrawer({
   onPost,
   onCancel,
   onPrint,
+  suppressEscape = false,
 }: {
   invoice: SalesInvoiceDto;
   warehouses: WarehouseLookupDto[];
@@ -537,10 +591,21 @@ function InvoiceDetailDrawer({
   onPost: () => void;
   onCancel: () => void;
   onPrint: () => void;
+  /** When a higher overlay (cancel confirm) is open, do not steal Escape. */
+  suppressEscape?: boolean;
 }) {
   const whText = warehouseLabel(invoice.warehouseId, warehouses);
   const isDraft = invoice.status === 1;
   const lines = invoice.lines ?? [];
+
+  useEffect(() => {
+    if (suppressEscape) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, suppressEscape]);
 
   return (
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true">
@@ -577,7 +642,7 @@ function InvoiceDetailDrawer({
             </div>
             <DetailField label="المستودع" value={whText} />
             <DetailField label="قيد GL" value={invoice.journalNumber ?? "—"} mono />
-            <DetailField label="Stock Document" value={invoice.stockDocumentId ?? "—"} mono />
+            <DetailField label="مستند المخزون" value={invoice.stockDocumentId ?? "—"} mono />
           </div>
 
           <div>
@@ -698,7 +763,7 @@ function InvoicesPage({
   customers: CustomerDto[];
   warehouses: WarehouseLookupDto[];
   items: ItemLookupDto[];
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<void>;
 }) {
   const defaultWh = warehouses.find(w => w.isDefault && w.isActive)?.id
     ?? warehouses.find(w => w.isActive)?.id
@@ -708,8 +773,10 @@ function InvoicesPage({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [posting, setPosting] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [form, setForm] = useState({
     docDate: new Date().toISOString().slice(0, 10),
     customerId: "",
@@ -721,6 +788,17 @@ function InvoicesPage({
   const [lines, setLines] = useState<LineDraft[]>([
     { itemId: "", description: "", qty: "1", unitPrice: "0" },
   ]);
+
+  useEffect(() => {
+    if (!showForm && !confirmCancelId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (confirmCancelId) setConfirmCancelId(null);
+      else if (showForm) setShowForm(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showForm, confirmCancelId]);
 
   const selectedInvoice =
     (selectedId && invoices.find((v) => v.id === selectedId)) || null;
@@ -738,12 +816,15 @@ function InvoicesPage({
     setShowForm(true);
   };
 
-  const filtered = invoices.filter(
-    (v) =>
-      v.number.toLowerCase().includes(search.toLowerCase()) ||
-      (v.customerName ?? "").toLowerCase().includes(search.toLowerCase()) ||
-      (v.customerCode ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  const q = search.toLowerCase();
+  const filtered = invoices.filter((v) => {
+    if (statusFilter !== "all" && String(v.status) !== statusFilter) return false;
+    return (
+      v.number.toLowerCase().includes(q) ||
+      (v.customerName ?? "").toLowerCase().includes(q) ||
+      (v.customerCode ?? "").toLowerCase().includes(q)
+    );
+  });
 
   const resolvedWarehouseId = (): string => {
     if (warehouses.length > 0) return form.warehouseId.trim();
@@ -755,7 +836,7 @@ function InvoicesPage({
     try {
       await api.postInvoice(id);
       toast.success("تم ترحيل الفاتورة بنجاح.");
-      onRefresh();
+      await onRefresh();
     } catch (err: any) {
       toast.error(err.message || "فشل الترحيل.");
     } finally {
@@ -764,12 +845,13 @@ function InvoicesPage({
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm("هل أنت متأكد من إلغاء هذه الفاتورة؟")) return;
     setCancelling(id);
+    setConfirmCancelId(null);
     try {
       await api.cancelInvoice(id);
       toast.success("تم إلغاء الفاتورة بنجاح.");
-      onRefresh();
+      if (selectedId === id) setSelectedId(null);
+      await onRefresh();
     } catch (err: any) {
       toast.error(err.message || "فشل إلغاء الفاتورة.");
     } finally {
@@ -798,11 +880,11 @@ function InvoicesPage({
     const warehouseId = resolvedWarehouseId();
     if (hasItemLines) {
       if (!warehouseId) {
-        toast.error("يجب اختيار المستودع عند وجود أصناف في الأسطر (ItemId).");
+        toast.error("يجب اختيار المستودع عند وجود أصناف في الأسطر.");
         return;
       }
       if (!GUID_RE.test(warehouseId)) {
-        toast.error("معرّف المستودع غير صالح (Guid).");
+        toast.error("معرّف المستودع غير صالح.");
         return;
       }
     }
@@ -819,7 +901,7 @@ function InvoicesPage({
       });
       toast.success("تم حفظ فاتورة البيع بنجاح.");
       setShowForm(false);
-      onRefresh();
+      await onRefresh();
     } catch (err: any) {
       toast.error(err.message || "فشل حفظ الفاتورة.");
     } finally {
@@ -838,6 +920,34 @@ function InvoicesPage({
 
   return (
     <div className="space-y-4 animate-page-in">
+      {confirmCancelId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40" role="dialog" aria-modal="true" aria-labelledby="sales-cancel-title">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 rounded-lg"><Ban size={20} className="text-red-600" /></div>
+              <h2 id="sales-cancel-title" className="font-semibold text-gray-800">تأكيد الإلغاء</h2>
+            </div>
+            <p className="text-sm text-gray-600">هل أنت متأكد من إلغاء هذه الفاتورة؟ لا يمكن التراجع عن هذه العملية.</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setConfirmCancelId(null)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                تراجع
+              </button>
+              <button
+                onClick={() => handleCancel(confirmCancelId)}
+                disabled={cancelling === confirmCancelId}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {cancelling === confirmCancelId ? <RefreshCw size={14} className="animate-spin" /> : <Ban size={14} />}
+                إلغاء الفاتورة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -848,6 +958,16 @@ function InvoicesPage({
             className="w-full border border-gray-300 rounded-lg pr-9 pl-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">جميع الحالات</option>
+          <option value="1">مسودة</option>
+          <option value="2">مرحّل</option>
+          <option value="3">ملغي</option>
+        </select>
         <span className="text-sm text-gray-500">{filtered.length} فاتورة</span>
         <button
           onClick={openForm}
@@ -859,11 +979,11 @@ function InvoicesPage({
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="sales-inv-form-title">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">فاتورة بيع جديدة</h2>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              <h2 id="sales-inv-form-title" className="font-semibold text-gray-800">فاتورة بيع جديدة</h2>
+              <button onClick={() => setShowForm(false)} aria-label="إغلاق" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -899,10 +1019,10 @@ function InvoicesPage({
                     <input
                       value={form.warehousePaste}
                       onChange={e => setForm(f => ({ ...f, warehousePaste: e.target.value }))}
-                      placeholder="الصق Warehouse Guid…"
+                      placeholder="الصق معرّف المستودع…"
                       className="w-full border border-amber-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
-                    <p className="text-[11px] text-amber-600">قائمة المستودعات غير متاحة من Inventory — الصق الـ Guid يدوياً لترحيل المخزون.</p>
+                    <p className="text-[11px] text-amber-600">قائمة المستودعات غير متاحة من المخزون — الصق المعرّف يدوياً لترحيل المخزون.</p>
                   </div>
                 )}
               </div>
@@ -958,7 +1078,7 @@ function InvoicesPage({
                       <input
                         value={line.itemId}
                         onChange={e => setLines(ls => ls.map((l, i) => i === idx ? { ...l, itemId: e.target.value } : l))}
-                        placeholder="ItemId Guid"
+                        placeholder="معرّف الصنف"
                         className="w-full border border-gray-300 rounded-lg px-2 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     )}
@@ -1015,8 +1135,8 @@ function InvoicesPage({
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">إلغاء</button>
-              <button onClick={handleSave} disabled={saving}
+              <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">إلغاء</button>
+              <button type="button" onClick={handleSave} disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
                 حفظ
@@ -1028,7 +1148,9 @@ function InvoicesPage({
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="py-10 text-center text-gray-400 text-sm">لا توجد فواتير مسجّلة بعد.</div>
+          <div className="py-10 text-center text-gray-400 text-sm">
+            {search.trim() || statusFilter !== "all" ? "لا نتائج مطابقة." : "لا توجد فواتير مسجّلة بعد."}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1076,11 +1198,11 @@ function InvoicesPage({
                             ترحيل
                           </button>
                           <button
-                            onClick={() => handleCancel(v.id)}
+                            onClick={() => setConfirmCancelId(v.id)}
                             disabled={posting === v.id || cancelling === v.id}
                             className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
                           >
-                            {cancelling === v.id ? <RefreshCw size={12} className="animate-spin" /> : <X size={12} />}
+                            <Ban size={12} />
                             إلغاء
                           </button>
                         </div>
@@ -1102,7 +1224,8 @@ function InvoicesPage({
           cancelling={cancelling === selectedInvoice.id}
           onClose={() => setSelectedId(null)}
           onPost={() => handlePost(selectedInvoice.id)}
-          onCancel={() => handleCancel(selectedInvoice.id)}
+          onCancel={() => setConfirmCancelId(selectedInvoice.id)}
+          suppressEscape={!!confirmCancelId}
           onPrint={() =>
             printInvoice(selectedInvoice, warehouseLabel(selectedInvoice.warehouseId, warehouses))
           }

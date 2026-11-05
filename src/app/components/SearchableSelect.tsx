@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
@@ -45,9 +45,9 @@ export function SearchableSelect({
   value,
   onChange,
   options,
-  placeholder = "Select…",
-  searchPlaceholder = "Search…",
-  emptyText = "No results",
+  placeholder = "اختر…",
+  searchPlaceholder = "بحث…",
+  emptyText = "لا نتائج",
   className,
   size = "md",
   allowClear = false,
