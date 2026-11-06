@@ -111,6 +111,10 @@ export function LoginScreen({
           </button>
         </form>
 
+        <p className="mt-4 text-center text-[11px] text-gray-400">
+          بعد الدخول: <kbd className="px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">Ctrl</kbd>+<kbd className="px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50 text-gray-500">K</kbd> للبحث السريع
+        </p>
+
         <p className="mt-6 text-center text-xs text-gray-400">
           © {new Date().getFullYear()} Soft Plan — Sales
         </p>

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, FileText,
   ChevronLeft, Bell, User, LogOut, Plus, Check, X,
   RefreshCw, Search, Menu, TrendingUp, ShoppingBag, Trash2, Warehouse,
-  Printer, Ban,
+  Printer, Ban, Star, Clock3,
 } from "lucide-react";
 import {
   api,
@@ -23,6 +23,11 @@ import {
   type SessionUser,
 } from "./api";
 import { LoginScreen } from "./LoginScreen";
+import { EmptyState } from "./EmptyState";
+import { ShortcutsHelp } from "./ShortcutsHelp";
+import { SkeletonBlock } from "./components/EnterpriseUI";
+import { CommandPalette, type PaletteHit } from "./CommandPalette";
+import { getUxPrefs, pushRecentPage, toggleFavoritePage, isFavoritePage } from "./enterprisePrefs";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Page = "dashboard" | "customers" | "invoices";
@@ -54,6 +59,16 @@ export default function App() {
   const [tenant, setTenant] = useState<SessionTenant | null>(null);
   const [page, setPage] = useState<Page>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [prefsTick, setPrefsTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setPrefsTick((t) => t + 1);
+    window.addEventListener("softplan-ux-prefs", bump);
+    return () => window.removeEventListener("softplan-ux-prefs", bump);
+  }, []);
+  void prefsTick;
+  const ux = getUxPrefs();
 
   const [bootstrap, setBootstrap] = useState<BootstrapDto | null>(null);
   const [loading, setLoading] = useState(false);
@@ -91,6 +106,27 @@ export default function App() {
   useEffect(() => {
     if (loggedIn) loadBootstrap();
   }, [loggedIn, loadBootstrap]);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+        e.preventDefault();
+        setHelpOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [loggedIn]);
+
+  const goPage = useCallback((p: Page) => {
+    pushRecentPage(p);
+    setPage(p);
+  }, []);
 
   const handleLogin = async (creds: { username: string; password: string; tenantCode?: string }) => {
     const result = await api.login(creds);
@@ -135,11 +171,72 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="flex-1 py-3 space-y-0.5 px-2">
+        <nav className="flex-1 py-3 space-y-0.5 px-2 overflow-y-auto">
+          {sidebarOpen && ux.favoritePages.length > 0 && (
+            <div className="mb-2">
+              <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                <Star size={10} className="text-amber-400" />
+                المفضلة
+              </div>
+              {ux.favoritePages.map((fp) => {
+                const item = NAV_ITEMS.find((n) => n.page === fp);
+                if (!item) return null;
+                return (
+                  <button
+                    key={`fav-${fp}`}
+                    type="button"
+                    onClick={() => goPage(item.page)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      page === item.page
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
+                  >
+                    {item.icon}
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+              <div className="my-2 border-t border-slate-700/80" />
+            </div>
+          )}
+
+          {sidebarOpen && ux.recentPages.filter((p) => !ux.favoritePages.includes(p)).length > 0 && (
+            <div className="mb-2">
+              <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                <Clock3 size={10} className="text-slate-400" />
+                الأخيرة
+              </div>
+              {ux.recentPages
+                .filter((p) => !ux.favoritePages.includes(p))
+                .slice(0, 4)
+                .map((rp) => {
+                  const item = NAV_ITEMS.find((n) => n.page === rp);
+                  if (!item) return null;
+                  return (
+                    <button
+                      key={`recent-${rp}`}
+                      type="button"
+                      onClick={() => goPage(item.page)}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        page === item.page
+                          ? "bg-blue-600 text-white"
+                          : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                      }`}
+                    >
+                      {item.icon}
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              <div className="my-2 border-t border-slate-700/80" />
+            </div>
+          )}
           {NAV_ITEMS.map((item) => (
             <button
               key={item.page}
-              onClick={() => setPage(item.page)}
+              onClick={() => goPage(item.page)}
+              aria-current={page === item.page ? "page" : undefined}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                 page === item.page
                   ? "bg-blue-600 text-white"
@@ -170,11 +267,35 @@ export default function App() {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center gap-3 bg-white border-b border-gray-200 px-5 py-3">
+        <header className="flex items-center gap-3 bg-white border-b border-gray-200 px-5 py-3 sticky top-0 z-20">
           <h1 className="text-base font-semibold text-gray-700">
             {NAV_ITEMS.find((n) => n.page === page)?.label ?? ""}
           </h1>
+          <button
+            type="button"
+            onClick={() => toggleFavoritePage(page)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              isFavoritePage(page)
+                ? "text-amber-500 hover:bg-amber-50"
+                : "text-gray-400 hover:text-amber-500 hover:bg-gray-100"
+            }`}
+            title={isFavoritePage(page) ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+            aria-label="تبديل المفضلة"
+          >
+            <Star size={15} fill={isFavoritePage(page) ? "currentColor" : "none"} />
+          </button>
           <div className="mr-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors border border-transparent hover:border-gray-200"
+              title="بحث سريع (Ctrl+K)"
+              aria-label="فتح Command Palette"
+            >
+              <Search size={14} />
+              <span className="hidden sm:inline">بحث</span>
+              <kbd className="hidden md:inline text-[10px] bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">Ctrl+K</kbd>
+            </button>
             <button
               type="button"
               onClick={loadBootstrap}
@@ -202,17 +323,17 @@ export default function App() {
         ) : null}
         <div className="flex-1 overflow-y-auto p-5">
           {loading && !bootstrap ? (
-            <div className="flex items-center justify-center h-40 gap-3 text-gray-500">
-              <RefreshCw size={20} className="animate-spin" />
-              <span>جاري تحميل البيانات…</span>
+            <div className="max-w-3xl space-y-4">
+              <div className="text-sm text-gray-500">جاري تحميل البيانات…</div>
+              <SkeletonBlock rows={7} />
             </div>
           ) : (
-            <>
+            <div key={page} className="animate-page-in">
               {page === "dashboard" && (
                 <DashboardPage
                   bootstrap={bootstrap}
-                  onOpenInvoices={() => setPage("invoices")}
-                  onOpenCustomers={() => setPage("customers")}
+                  onOpenInvoices={() => goPage("invoices")}
+                  onOpenCustomers={() => goPage("customers")}
                 />
               )}
               {page === "customers" && (
@@ -230,10 +351,35 @@ export default function App() {
                   onRefresh={loadBootstrap}
                 />
               )}
-            </>
+            </div>
           )}
         </div>
       </main>
+      <ShortcutsHelp open={helpOpen} onClose={() => setHelpOpen(false)} accentClass="text-blue-600" />
+      {searchOpen && (
+        <CommandPalette
+          navItems={NAV_ITEMS.map(({ page: p, label }) => ({ page: p, label }))}
+          onClose={() => setSearchOpen(false)}
+          setPage={(p) => goPage(p as Page)}
+          placeholder="ابحث في الصفحات، العملاء، فواتير البيع…"
+          accentClass="bg-blue-50"
+          iconClass="text-blue-600"
+          markClass="bg-blue-50 text-blue-900"
+          extraHits={[
+            ...((bootstrap?.customers ?? []).slice(0, 40).map(
+              (c): PaletteHit => ({ kind: "Customer", label: c.name || c.code, sub: c.code, page: "customers" }),
+            )),
+            ...((bootstrap?.recentInvoices ?? []).slice(0, 20).map(
+              (inv): PaletteHit => ({
+                kind: "Invoice",
+                label: inv.number,
+                sub: inv.customerName || (inv.docDate || "").slice(0, 10),
+                page: "invoices",
+              }),
+            )),
+          ]}
+        />
+      )}
       <Toaster position="top-left" richColors />
     </div>
   );
@@ -324,7 +470,7 @@ function DashboardPage({
           <div className="py-10 text-center text-gray-400 text-sm">لا توجد فواتير مسجّلة بعد.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs">
+            <thead className="bg-gray-50 text-gray-500 text-xs sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 py-2 text-right">رقم</th>
                 <th className="px-4 py-2 text-right">العميل</th>
@@ -464,9 +610,11 @@ function CustomersPage({ customers, onRefresh }: { customers: CustomerDto[]; onR
       )}
 
       {customers.length === 0 ? (
-        <div className="py-16 text-center text-gray-400 text-sm bg-white rounded-xl border border-gray-200">
-          لا يوجد عملاء مسجّلون بعد.
-        </div>
+        <EmptyState
+          icon={<Users size={22} />}
+          title="لا يوجد عملاء مسجّلون بعد"
+          description="أضف عميلًا قبل إنشاء فواتير البيع."
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {customers.map((s) => (
@@ -649,7 +797,7 @@ function InvoiceDetailDrawer({
             <h3 className="text-sm font-semibold text-gray-700 mb-2">الأسطر</h3>
             <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="w-full text-xs">
-                <thead className="bg-gray-50 text-gray-500">
+                <thead className="bg-gray-50 text-gray-500 sticky top-0 z-10 shadow-sm">
                   <tr>
                     <th className="px-3 py-2 text-right">#</th>
                     <th className="px-3 py-2 text-right">الوصف</th>
@@ -958,16 +1106,27 @@ function InvoicesPage({
             className="w-full border border-gray-300 rounded-lg pr-9 pl-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">جميع الحالات</option>
-          <option value="1">مسودة</option>
-          <option value="2">مرحّل</option>
-          <option value="3">ملغي</option>
-        </select>
+                <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="فلتر الحالة">
+          {([
+            { v: "all", l: "الكل" },
+            { v: "1", l: "مسودة" },
+            { v: "2", l: "مرحّل" },
+            { v: "3", l: "ملغي" },
+          ] as const).map((chip) => (
+            <button
+              key={chip.v}
+              type="button"
+              onClick={() => setStatusFilter(chip.v)}
+              className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                statusFilter === chip.v
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              {chip.l}
+            </button>
+          ))}
+        </div>
         <span className="text-sm text-gray-500">{filtered.length} فاتورة</span>
         <button
           onClick={openForm}
@@ -1148,13 +1307,15 @@ function InvoicesPage({
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="py-10 text-center text-gray-400 text-sm">
-            {search.trim() || statusFilter !== "all" ? "لا نتائج مطابقة." : "لا توجد فواتير مسجّلة بعد."}
-          </div>
+          <EmptyState
+            icon={<FileText size={22} />}
+            title={search.trim() || statusFilter !== "all" ? "لا نتائج مطابقة" : "لا توجد فواتير مسجّلة بعد"}
+            description={search.trim() || statusFilter !== "all" ? "عدّل البحث أو فلتر الحالة." : "أنشئ فاتورة بيع للمتابعة."}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs">
+              <thead className="bg-gray-50 text-gray-500 text-xs sticky top-0 z-10 shadow-sm">
                 <tr>
                   <th className="px-4 py-2 text-right">الرقم</th>
                   <th className="px-4 py-2 text-right">العميل</th>
