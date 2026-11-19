@@ -268,10 +268,24 @@ function authHeaders(opts?: { json?: boolean }): Record<string, string> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: { ...authHeaders(), ...(init?.headers || {}) }
-  });
+  const ctrl = new AbortController();
+  const timeoutMs = 20_000;
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: { ...authHeaders(), ...(init?.headers || {}) },
+      signal: init?.signal ?? ctrl.signal,
+    });
+  } catch (e: any) {
+    clearTimeout(timer);
+    if (e?.name === "AbortError") {
+      throw new Error(`انتهت مهلة الطلب بعد ${timeoutMs / 1000} ثانية — أعد المحاولة`);
+    }
+    throw e;
+  }
+  clearTimeout(timer);
   if (!res.ok) {
     const raw = await res.text();
 
