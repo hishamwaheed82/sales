@@ -267,7 +267,7 @@ function authHeaders(opts?: { json?: boolean }): Record<string, string> {
   return headers;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestOnce<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController();
   const timeoutMs = 20_000;
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -281,7 +281,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch (e: any) {
     clearTimeout(timer);
     if (e?.name === "AbortError") {
-      throw new Error(`انتهت مهلة الطلب بعد ${timeoutMs / 1000} ثانية — أعد المحاولة`);
+      const te = new Error(`انتهت مهلة الطلب بعد ${timeoutMs / 1000} ثانية — أعد المحاولة`) as Error & { status?: number };
+      te.status = 408;
+      throw te;
     }
     throw e;
   }
@@ -314,11 +316,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       err?.error?.data?.reason ||
       err?.data?.Reason ||
       err?.data?.reason;
-    throw new Error(reason ? `${message} — ${reason}` : message);
+    const he = new Error(reason ? `${message} — ${reason}` : message) as Error & { status?: number };
+    he.status = res.status;
+    throw he;
   }
   if (res.status === 204) return undefined as T;
   return res.json();
 }
+/** GET retries once on network / timeout / 5xx only — never on 4xx. */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method || "GET").toUpperCase();
+  try {
+    return await requestOnce<T>(path, init);
+  } catch (e: any) {
+    const status = e?.status as number | undefined;
+    const retryable = method === "GET" && (status == null || status >= 500 || status === 408);
+    if (retryable) return requestOnce<T>(path, init);
+    throw e;
+  }
+}
+
 
 export function getStoredToken() {
   const token = localStorage.getItem(TOKEN_KEY);
