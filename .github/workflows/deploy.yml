@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOFTPLAN_UI_DEPLOY_KEY }}
       - run: npm ci
       - name: Build (production settings are public, not secrets)
         run: npm run build
