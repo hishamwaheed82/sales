@@ -1,3 +1,5 @@
+import { softPlanRequest, SoftPlanApiError } from "@softplan/ui";
+
 ﻿const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || "/api/v1";
 // In Vite DEV always use same-origin /connect (proxied to H.Auth) — avoids CORS +
 // browser rejection of the ASP.NET HTTPS development certificate on :44380.
@@ -267,74 +269,46 @@ function authHeaders(opts?: { json?: boolean }): Record<string, string> {
   return headers;
 }
 
-async function requestOnce<T>(path: string, init?: RequestInit): Promise<T> {
-  const ctrl = new AbortController();
-  const timeoutMs = 20_000;
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers: { ...authHeaders(), ...(init?.headers || {}) },
-      signal: init?.signal ?? ctrl.signal,
-    });
-  } catch (e: any) {
-    clearTimeout(timer);
-    if (e?.name === "AbortError") {
-      const te = new Error(`انتهت مهلة الطلب بعد ${timeoutMs / 1000} ثانية — أعد المحاولة`) as Error & { status?: number };
-      te.status = 408;
-      throw te;
-    }
-    throw e;
-  }
-  clearTimeout(timer);
-  if (!res.ok) {
-    const raw = await res.text();
-
-    if (res.status === 401) {
-      forceLogin("HTTP 401");
-      throw new Error("انتهت الجلسة. يرجى تسجيل الدخول مجدداً.");
-    }
-
-    if (res.status === 404 && /Tenant not found/i.test(raw)) {
-      forceLogin("invalid-tenant");
-      throw new Error("المستأجر غير صالح. يرجى تسجيل الدخول مجدداً.");
-    }
-    let err: any = {};
-    try {
-      err = JSON.parse(raw);
-    } catch {
-      /* HTML or empty body */
-    }
-    const message =
-      err?.error?.message ||
-      err?.error_description ||
-      err?.message ||
-      `Request failed (${res.status})`;
-    const reason =
-      err?.error?.data?.Reason ||
-      err?.error?.data?.reason ||
-      err?.data?.Reason ||
-      err?.data?.reason;
-    const he = new Error(reason ? `${message} — ${reason}` : message) as Error & { status?: number };
-    he.status = res.status;
-    throw he;
-  }
-  if (res.status === 204) return undefined as T;
-  return res.json();
-}
-/** GET retries once on network / timeout / 5xx only — never on 4xx. */
+/** Shared kit fetch: timeout + one GET retry on network/408/5xx (never 4xx). */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const method = (init?.method || "GET").toUpperCase();
+  const tenant = getStoredTenant();
+  const tenantCode =
+    tenant?.id && tenant.id !== "host" && tenant.code && tenant.code !== "HOST" && tenant.code !== "Default"
+      ? tenant.code
+      : null;
   try {
-    return await requestOnce<T>(path, init);
-  } catch (e: any) {
-    const status = e?.status as number | undefined;
-    const retryable = method === "GET" && (status == null || status >= 500 || status === 408);
-    if (retryable) return requestOnce<T>(path, init);
+    return await softPlanRequest<T>(`${API_BASE}${path}`, {
+      ...init,
+      token: getStoredToken(),
+      tenantCode,
+      timeoutMs: 20_000,
+      onUnauthorized: () => forceLogin("HTTP 401"),
+    });
+  } catch (e) {
+    if (e instanceof SoftPlanApiError) {
+      const rawText = typeof e.raw === "string" ? e.raw : JSON.stringify(e.raw ?? "");
+      if (e.status === 404 && /Tenant not found/i.test(rawText)) {
+        forceLogin("invalid-tenant");
+        throw new Error("المستأجر غير صالح. يرجى تسجيل الدخول مجدداً.");
+      }
+      if (e.status === 401) {
+        throw new Error("انتهت الجلسة. يرجى تسجيل الدخول مجدداً.");
+      }
+      const errBody = (e.raw ?? {}) as any;
+      const reason =
+        errBody?.error?.data?.Reason ||
+        errBody?.error?.data?.reason ||
+        errBody?.data?.Reason ||
+        errBody?.data?.reason;
+      const err = new Error(reason ? `${e.message} — ${reason}` : e.message) as Error & { status?: number };
+      err.status = e.status;
+      throw err;
+    }
     throw e;
   }
 }
+
+
 
 
 export function getStoredToken() {
