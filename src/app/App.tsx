@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ErrorState, formatDate, formatMoney } from "@softplan/ui";
+import { ErrorState, formatDate, formatMoney, formatQty } from "@softplan/ui";
 import { Toaster, toast } from "sonner";
 import {
   LayoutDashboard, Users, FileText,
@@ -422,14 +422,14 @@ function DashboardPage({
   }[] = [
     {
       title: "العملاء",
-      value: bootstrap.customers.length.toLocaleString("en-US"),
+      value: formatQty(bootstrap.customers.length),
       icon: <Users size={22} className="text-blue-500" />,
       bg: "bg-blue-50",
       onClick: onOpenCustomers,
     },
     {
       title: "فواتير المسودة",
-      value: draftCount.toLocaleString("en-US"),
+      value: formatQty(draftCount),
       icon: <FileText size={22} className="text-yellow-500" />,
       bg: "bg-yellow-50",
       onClick: onOpenInvoices,
@@ -443,7 +443,7 @@ function DashboardPage({
     },
     {
       title: "آخر الفواتير",
-      value: bootstrap.recentInvoices.length.toLocaleString("en-US"),
+      value: formatQty(bootstrap.recentInvoices.length),
       icon: <ShoppingBag size={22} className="text-indigo-500" />,
       bg: "bg-indigo-50",
       onClick: onOpenInvoices,
