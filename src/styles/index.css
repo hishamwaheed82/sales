@@ -36,4 +36,5 @@
 .animate-drawer-in {
   animation: drawer-in 0.22s ease-out;
 }
-
+@import '@softplan/ui/datagrid.css';
+@import '@softplan/ui/theme.css';

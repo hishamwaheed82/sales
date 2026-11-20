@@ -1,4 +1,6 @@
 @import 'tailwindcss' source(none);
 @source '../**/*.{js,ts,jsx,tsx}';
+@source '../../node_modules/@softplan/ui/dist';
+@source '../../node_modules/@softplan/ui/src';
 
 @import 'tw-animate-css';

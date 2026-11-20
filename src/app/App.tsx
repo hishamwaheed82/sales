@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { ErrorState, formatDate, formatMoney, formatQty } from "@softplan/ui";
 import { Toaster, toast } from "sonner";
 import {
   LayoutDashboard, Users, FileText,
@@ -43,7 +44,7 @@ const DOC_STATUS_COLOR: Record<number, string> = {
   3: "bg-red-100 text-red-700",
 };
 
-const fmt = (n: number) => n.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number) => formatMoney(n);
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const NAV_ITEMS: { page: Page; label: string; icon: React.ReactNode }[] = [
@@ -397,7 +398,15 @@ function DashboardPage({
   onOpenInvoices?: () => void;
   onOpenCustomers?: () => void;
 }) {
-  if (!bootstrap) return null;
+  if (!bootstrap) {
+    return (
+      <ErrorState
+        title="تعذر تحميل البيانات"
+        description="فشل تحميل الـ bootstrap — أعد المحاولة."
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
 
   const draftCount = bootstrap.recentInvoices.filter((v) => v.status === 1).length;
   const postedTotal = bootstrap.recentInvoices
@@ -413,14 +422,14 @@ function DashboardPage({
   }[] = [
     {
       title: "العملاء",
-      value: bootstrap.customers.length.toLocaleString("ar-EG"),
+      value: formatQty(bootstrap.customers.length),
       icon: <Users size={22} className="text-blue-500" />,
       bg: "bg-blue-50",
       onClick: onOpenCustomers,
     },
     {
       title: "فواتير المسودة",
-      value: draftCount.toLocaleString("ar-EG"),
+      value: formatQty(draftCount),
       icon: <FileText size={22} className="text-yellow-500" />,
       bg: "bg-yellow-50",
       onClick: onOpenInvoices,
@@ -434,7 +443,7 @@ function DashboardPage({
     },
     {
       title: "آخر الفواتير",
-      value: bootstrap.recentInvoices.length.toLocaleString("ar-EG"),
+      value: formatQty(bootstrap.recentInvoices.length),
       icon: <ShoppingBag size={22} className="text-indigo-500" />,
       bg: "bg-indigo-50",
       onClick: onOpenInvoices,
@@ -490,7 +499,7 @@ function DashboardPage({
                   <td className="px-4 py-2 font-mono text-xs text-blue-700">{v.number}</td>
                   <td className="px-4 py-2">{v.customerName ?? v.customerCode ?? "—"}</td>
                   <td className="px-4 py-2 font-medium">{fmt(v.grandTotal)}</td>
-                  <td className="px-4 py-2 text-gray-500">{new Date(v.docDate).toLocaleDateString("ar-EG")}</td>
+                  <td className="px-4 py-2 text-gray-500">{formatDate(v.docDate)}</td>
                   <td className="px-4 py-2 font-mono text-xs text-gray-500">{v.journalNumber ?? "—"}</td>
                   <td className="px-4 py-2">
                     <span className={`px-2 py-0.5 rounded-full text-xs ${DOC_STATUS_COLOR[v.status] ?? "bg-gray-100"}`}>
@@ -690,7 +699,7 @@ function printInvoice(inv: SalesInvoiceDto, warehouseText: string) {
     <h1>فاتورة بيع — ${inv.number}</h1>
     <div class="meta">
       <div><span>العميل:</span> ${inv.customerName ?? inv.customerCode ?? "—"}</div>
-      <div><span>التاريخ:</span> ${new Date(inv.docDate).toLocaleDateString("ar-EG")}</div>
+      <div><span>التاريخ:</span> ${formatDate(inv.docDate)}</div>
       <div><span>الحالة:</span> ${DOC_STATUS_LABEL[inv.status] ?? inv.status}</div>
       <div><span>المستودع:</span> ${warehouseText}</div>
       <div><span>قيد GL:</span> ${inv.journalNumber ?? "—"}</div>
@@ -781,7 +790,7 @@ function InvoiceDetailDrawer({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <DetailField label="العميل" value={invoice.customerName ?? invoice.customerCode ?? "—"} />
-            <DetailField label="التاريخ" value={new Date(invoice.docDate).toLocaleDateString("ar-EG")} />
+            <DetailField label="التاريخ" value={formatDate(invoice.docDate)} />
             <div>
               <div className="text-xs text-gray-500 mb-1">الحالة</div>
               <span className={`px-2 py-0.5 rounded-full text-xs ${DOC_STATUS_COLOR[invoice.status] ?? "bg-gray-100"}`}>
@@ -1340,7 +1349,7 @@ function InvoicesPage({
                     <td className="px-4 py-2">{v.customerName ?? v.customerCode ?? "—"}</td>
                     <td className="px-4 py-2 font-medium">{fmt(v.grandTotal)}</td>
                     <td className="px-4 py-2 text-gray-500">{fmt(v.taxTotal)}</td>
-                    <td className="px-4 py-2 text-gray-500">{new Date(v.docDate).toLocaleDateString("ar-EG")}</td>
+                    <td className="px-4 py-2 text-gray-500">{formatDate(v.docDate)}</td>
                     <td className="px-4 py-2">
                       <span className={`px-2 py-0.5 rounded-full text-xs ${DOC_STATUS_COLOR[v.status] ?? "bg-gray-100"}`}>
                         {DOC_STATUS_LABEL[v.status] ?? v.status}
